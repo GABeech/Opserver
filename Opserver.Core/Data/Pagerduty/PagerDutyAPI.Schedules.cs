@@ -63,8 +63,22 @@ namespace StackExchange.Opserver.Data.PagerDuty
 
         private Task<List<PagerDutySchedule>> GetAllSchedulesAsync()
         {
-            return GetFromPagerDutyAsync("schedules", getFromJson:
+            try
+            {
+                return GetFromPagerDutyAsync("schedules", getFromJson:
                 response => JSON.Deserialize<PagerDutyScheduleResponse>(response.ToString(), JilOptions).Schedules);
+            }
+            catch (DeserializationException de)
+            {
+                Current.LogException(
+                  de.AddLoggedData("Snippet After", de.SnippetAfterError)
+                  .AddLoggedData("Message", de.Message)
+                  
+                );
+
+                return null;
+            }
+            
         }
     }
 
@@ -97,7 +111,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
             var result = await PagerDutyAPI.Instance.GetFromPagerDutyAsync("schedules/" + Id + "/overrides",
                 getFromJson: response => response.ToString(), httpMethod: "POST", data: overrideData).ConfigureAwait(false);
 
-            await PagerDutyAPI.Instance.OnCallUsers.PollAsync(true).ConfigureAwait(false);
+            await PagerDutyAPI.Instance.OnCallInfo.PollAsync(true).ConfigureAwait(false);
             await PagerDutyAPI.Instance.PrimaryScheduleOverrides.PollAsync(true).ConfigureAwait(false);
             return result;
         }

@@ -155,9 +155,9 @@
                     }
                 </td>
                 <td>
-                    @if (i.SummaryData.Keys.Contains("subject"))
+                    @if (i.Summary != null)//.Keys.Contains("subject"))
                     {
-                        @i.SummaryData["subject"]
+                        @i.Summary;
                     }
                 </td>
             </tr>

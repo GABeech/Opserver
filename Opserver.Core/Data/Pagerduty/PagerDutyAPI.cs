@@ -24,7 +24,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
 
         protected override IEnumerable<MonitorStatus> GetMonitorStatus()
         {
-            if (OnCallUsers.ContainsData)
+            if (OnCallInfo.ContainsData)
             {
                 foreach (var a in GetSchedule())
                     yield return a.MonitorStatus;
@@ -43,7 +43,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         {
             get
             {
-                yield return OnCallUsers;
+                yield return OnCallInfo;
                 yield return Incidents;
                 yield return AllSchedules;
             }
@@ -71,13 +71,14 @@ namespace StackExchange.Opserver.Data.PagerDuty
         /// <returns></returns>
         public async Task<T> GetFromPagerDutyAsync<T>(string path, Func<string, T> getFromJson, string httpMethod = "GET", object data = null)
         {
-            var url = Settings.APIBaseUrl;
+            var url = "https://api.pagerduty.com/"; //Settings.APIBaseUrl;
             var fullUri = url + path;
             
             using (MiniProfiler.Current.CustomTiming("http", fullUri, httpMethod))
             {
                 var req = (HttpWebRequest)WebRequest.Create(fullUri);
                 req.Method = httpMethod;
+                req.Accept = "application/vnd.pagerduty+json;version=2";
                 req.Headers.Add("Authorization: Token token=" + APIKey);
 
                 if (httpMethod == "POST" || httpMethod == "PUT")
