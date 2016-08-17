@@ -13,29 +13,31 @@ namespace StackExchange.Opserver.Data.PagerDuty
         // TODO: We need to able able to handle when people have more than one on call schedule
         public PagerDutyPerson PrimaryOnCall
         {
-            get { return OnCallUsers.Data.FirstOrDefault(p => p.EscalationLevel == 1); }
+            get { return OnCallInfo.Data.FirstOrDefault(p => p.AssignedUser.EscalationLevel == 1).AssignedUser; }
         }
 
         public PagerDutyPerson SecondaryOnCall
         {
-            get { return OnCallUsers.Data.FirstOrDefault(p => p.EscalationLevel == 2); }
+            get { return OnCallInfo.Data.FirstOrDefault(p => p.AssignedUser.EscalationLevel == 2).AssignedUser; }
         }
 
-        private Cache<List<PagerDutyPerson>> _oncallusers;
-        public Cache<List<PagerDutyPerson>> OnCallUsers => _oncallusers ?? (_oncallusers = new Cache<List<PagerDutyPerson>>()
+        private Cache<List<OnCall>> _oncallinfo;
+        public Cache<List<OnCall>> OnCallInfo => _oncallinfo ?? (_oncallinfo = new Cache<List<OnCall>>()
         {
             CacheForSeconds = 60*60,
             UpdateCache = UpdateCacheItem(
-                description: nameof(OnCallUsers),
+                description: nameof(OnCallInfo),
                 getData: GetOnCallUsers,
                 logExceptions: true
                 )
         });
 
-        private Task<List<PagerDutyPerson>> GetOnCallUsers()
+        private Task<List<OnCall>> GetOnCallUsers()
         {
-            return GetFromPagerDutyAsync("users/on_call?include[]=contact_methods", getFromJson:
-                response => JSON.Deserialize<PagerDutyUserResponse>(response.ToString(), JilOptions).Users);
+            return GetFromPagerDutyAsync("oncalls?include[]=users", getFromJson:
+                response => JSON.Deserialize<PagerDutyOnCallResponse>(response.ToString(), JilOptions).OnCallInfo);
+            
+
         }
 
         private List<OnCallAssignment> _scheduleCache;
@@ -46,16 +48,18 @@ namespace StackExchange.Opserver.Data.PagerDuty
             {
                 var result = new List<OnCallAssignment>();
                 var overrides = PrimaryScheduleOverrides?.Data;
-                if (!OnCallUsers.HasData()) return result;
-                foreach (var p in OnCallUsers.Data)
+                if (!OnCallInfo.HasData()) return result;
+                /*
+                foreach (var p in OnCallInfo.Data)
                 {
-                    if (p.Schedule == null) continue;
-                    for (var i = 0; i < p.Schedule.Count; i++)
+                    if (p == null) continue;
+                    for (var i = 0; i < p.Count; i++)
                     {
                         var isOverride = overrides?.Any(o => o.StartTime <= DateTime.UtcNow && DateTime.UtcNow <= o.EndTime && o.User.Id == p.Id) ?? false;
-                        result.Add(new OnCallAssignment { Person = p, Schedule = p.Schedule[i], IsOverride = isOverride });
+                        result.Add(new OnCallAssignment { Person = p.AssignedUser, Schedule = p.Schedule[i], IsOverride = isOverride });
                     }
                 }
+                */
                 result.Sort((a, b) => a.EscalationLevel.GetValueOrDefault(int.MaxValue).CompareTo(b.EscalationLevel.GetValueOrDefault(int.MaxValue)));
 
                 if (result.Count > 1 && result[0].Person.Id == result[1].Person.Id)
@@ -87,12 +91,17 @@ namespace StackExchange.Opserver.Data.PagerDuty
         public string MonitorStatusReason { get; internal set; }
     }
 
+    public class PagerDutyOnCallResponse
+    {
+        [DataMember(Name = "oncall")]
+        public List<OnCall> OnCallInfo;
+    }
+
     public class PagerDutyUserResponse
     {
         [DataMember(Name = "users")]
         public List<PagerDutyPerson> Users;
     }
-
     public class PagerDutySingleUserResponse
     {
         [DataMember(Name = "user")] public PagerDutyPerson User;
@@ -102,7 +111,9 @@ namespace StackExchange.Opserver.Data.PagerDuty
     {
         [DataMember(Name = "id")]
         public string Id { get; set; }
-        [DataMember(Name = "name")]
+        // TODO: Open ticket with Pager duty to see if Summary is 
+        //       Garunteed to be the Same as "Name" on a User Object
+        [DataMember(Name = "summary")]
         public string FullName { get; set; }
         [DataMember(Name = "email")]
         public string Email { get; set; }
@@ -204,5 +215,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         public DateTime? EndDate { get; set; }
         [DataMember(Name = "escalation_policy")]
         public Dictionary<string,string> Policy { get; set; } 
+        [DataMember(Name = "user")]
+        public PagerDutyPerson AssignedUser { get; set; }
     }
 }
