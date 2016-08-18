@@ -70,7 +70,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         /// <param name="httpMethod"></param>
         /// <param name="data"></param>
         /// <returns></returns>
-        public async Task<T> GetFromPagerDutyAsync<T>(string path, Func<string, T> getFromJson, string httpMethod = "GET", object data = null)
+        public async Task<T> GetFromPagerDutyAsync<T>(string path, Func<string, T> getFromJson, string httpMethod = "GET", object data = null, Dictionary<string,string> extraHeaders = null)
         {
             var url = "https://api.pagerduty.com/"; //Settings.APIBaseUrl;
             var fullUri = url + path;
@@ -81,6 +81,13 @@ namespace StackExchange.Opserver.Data.PagerDuty
                 req.Method = httpMethod;
                 req.Accept = "application/vnd.pagerduty+json;version=2";
                 req.Headers.Add("Authorization: Token token=" + APIKey);
+                if (extraHeaders != null)
+                {
+                    foreach (var h in extraHeaders.Keys)
+                    {
+                        req.Headers.Add(h, extraHeaders[h]);
+                    }
+                }
 
                 if (httpMethod == "POST" || httpMethod == "PUT")
                 {
@@ -120,7 +127,15 @@ namespace StackExchange.Opserver.Data.PagerDuty
                             }
                         }
                     }
-                    catch { /* we gave it a shot, but don't boom in the boom that feeds */ }
+                    catch(Exception ex)
+                    {
+                         /* we gave it a shot, but don't boom in the boom that feeds */
+                         // TEMPORARY (LOL) for troubleshooting
+
+                        Current.LogException(
+                            ex
+                            );
+                    }
 
                     Current.LogException(
                         e.AddLoggedData("Sent Data", JSON.Serialize(data, JilOptions))
