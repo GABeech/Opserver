@@ -46,6 +46,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
                 yield return OnCallInfo;
                 yield return Incidents;
                 yield return AllSchedules;
+                yield return AllUsers;
             }
         }
         
@@ -147,7 +148,18 @@ namespace StackExchange.Opserver.Data.PagerDuty
 
         private Task<List<PagerDutyPerson>> GetAllUsers()
         {
-            return GetFromPagerDutyAsync("users/", r => JSON.Deserialize<PagerDutyUserResponse>(r.ToString(), JilOptions).Users);
+            try
+            {
+                return GetFromPagerDutyAsync("users", r => JSON.Deserialize<PagerDutyUserResponse>(r.ToString(), JilOptions).Users);
+            }
+            catch(DeserializationException de)
+            {
+                Current.LogException(
+                    de.AddLoggedData("Snippet After", de.SnippetAfterError)
+                    .AddLoggedData("Message", de.Message)
+                );
+                return null;
+            }
         }
     }
 }

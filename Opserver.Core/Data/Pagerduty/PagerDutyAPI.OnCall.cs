@@ -34,8 +34,19 @@ namespace StackExchange.Opserver.Data.PagerDuty
 
         private Task<List<OnCall>> GetOnCallUsers()
         {
-            return GetFromPagerDutyAsync("oncalls?include[]=users", getFromJson:
-                response => JSON.Deserialize<PagerDutyOnCallResponse>(response.ToString(), JilOptions).OnCallInfo);
+            try
+            {
+                return GetFromPagerDutyAsync("oncalls?include[]=users", getFromJson:
+                    response => JSON.Deserialize<PagerDutyOnCallResponse>(response.ToString(), JilOptions).OnCallInfo);
+            }
+            catch (DeserializationException de)
+            {
+                Current.LogException(
+                    de.AddLoggedData("Snippet After", de.SnippetAfterError)
+                    .AddLoggedData("Message", de.Message)
+                    );
+                return null;
+            }
             
 
         }
