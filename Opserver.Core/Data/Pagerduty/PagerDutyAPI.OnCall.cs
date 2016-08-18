@@ -199,7 +199,15 @@ namespace StackExchange.Opserver.Data.PagerDuty
 
         public PagerDutyPerson AssignedUser => PagerDutyAPI.Instance.AllUsers.Data.FirstOrDefault(u => u.Id == User.Id);
 
-        public bool IsOverride { get; set; }
+        public bool IsOverride
+        {
+            get
+            {
+                return
+                    PagerDutyAPI.Instance.PrimaryScheduleOverrides.Data?.Any(
+                        o => o.StartTime <= DateTime.UtcNow && DateTime.UtcNow <= o.EndTime && o.User.Id == AssignedUser.Id) ?? false;
+            }
+        }
 
         public bool IsPrimary => EscalationLevel == 1;
 
@@ -228,9 +236,9 @@ namespace StackExchange.Opserver.Data.PagerDuty
             }
         }
 
-        public MonitorStatus MonitorStatus { get; internal set; }
+        public MonitorStatus MonitorStatus { get; set; }
 
-        public string MonitorStatusReason { get; internal set; }
+        public string MonitorStatusReason { get; set; }
     }
 
 }
