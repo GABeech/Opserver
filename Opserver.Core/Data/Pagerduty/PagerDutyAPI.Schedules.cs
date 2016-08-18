@@ -105,7 +105,11 @@ namespace StackExchange.Opserver.Data.PagerDuty
                 {
                     start,
                     end,
-                    user_id = pdPerson.Id
+                    user = new 
+                    {
+                        id = pdPerson.Id,
+                        type = "user_reference"
+                    }
                 }
             };
             var result = await PagerDutyAPI.Instance.GetFromPagerDutyAsync("schedules/" + Id + "/overrides",
