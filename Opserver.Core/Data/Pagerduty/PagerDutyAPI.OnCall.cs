@@ -13,12 +13,12 @@ namespace StackExchange.Opserver.Data.PagerDuty
         // TODO: We need to able able to handle when people have more than one on call schedule
         public PagerDutyPerson PrimaryOnCall
         {
-            get { return OnCallInfo.Data.FirstOrDefault(p => p.AssignedUser.EscalationLevel == 1).AssignedUser; }
+            get { return OnCallInfo.Data.FirstOrDefault(p => p.EscalationLevel == 1).AssignedUser; }
         }
 
         public PagerDutyPerson SecondaryOnCall
         {
-            get { return OnCallInfo.Data.FirstOrDefault(p => p.AssignedUser.EscalationLevel == 2).AssignedUser; }
+            get { return OnCallInfo.Data.FirstOrDefault(p => p.EscalationLevel == 2).AssignedUser; }
         }
 
         private Cache<List<OnCall>> _oncallinfo;
@@ -36,7 +36,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         {
             try
             {
-                return GetFromPagerDutyAsync("oncalls?include[]=users", getFromJson:
+                return GetFromPagerDutyAsync("oncalls", getFromJson:
                     response => JSON.Deserialize<PagerDutyOnCallResponse>(response.ToString(), JilOptions).OnCallInfo);
             }
             catch (DeserializationException de)
@@ -51,60 +51,12 @@ namespace StackExchange.Opserver.Data.PagerDuty
 
         }
 
-        private List<OnCallAssignment> _scheduleCache;
-
-        public List<OnCallAssignment> GetSchedule()
-        {
-            if (_scheduleCache == null)
-            {
-                var result = new List<OnCallAssignment>();
-                var overrides = PrimaryScheduleOverrides?.Data;
-                if (!OnCallInfo.HasData()) return result;
-                /*
-                foreach (var p in OnCallInfo.Data)
-                {
-                    if (p == null) continue;
-                    for (var i = 0; i < p.Count; i++)
-                    {
-                        var isOverride = overrides?.Any(o => o.StartTime <= DateTime.UtcNow && DateTime.UtcNow <= o.EndTime && o.User.Id == p.Id) ?? false;
-                        result.Add(new OnCallAssignment { Person = p.AssignedUser, Schedule = p.Schedule[i], IsOverride = isOverride });
-                    }
-                }
-                */
-                result.Sort((a, b) => a.EscalationLevel.GetValueOrDefault(int.MaxValue).CompareTo(b.EscalationLevel.GetValueOrDefault(int.MaxValue)));
-
-                if (result.Count > 1 && result[0].Person.Id == result[1].Person.Id)
-                {
-                    result[1].MonitorStatus = MonitorStatus.Warning;
-                    result[1].MonitorStatusReason = "Primary and secondary on call are the same";
-                }
-
-                _scheduleCache = result;
-            }
-            return _scheduleCache;
-        }
-    }
-
-    public class OnCallAssignment : IMonitorStatus
-    {
-        public PagerDutyPerson Person { get; set; }
-        public OnCall Schedule { get; set; }
-        public bool IsOverride { get; set; }
-
-        public int? EscalationLevel => Schedule?.EscalationLevel;
-
-        public bool IsPrimary => EscalationLevel == 1;
-
-        public string EscalationLevelDescription => PagerDutyPerson.GetEscalationLevelDescription(EscalationLevel);
-
-        public MonitorStatus MonitorStatus { get; internal set; }
-
-        public string MonitorStatusReason { get; internal set; }
+       
     }
 
     public class PagerDutyOnCallResponse
     {
-        [DataMember(Name = "oncall")]
+        [DataMember(Name = "oncalls")]
         public List<OnCall> OnCallInfo;
     }
 
@@ -140,6 +92,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         public string UserUrl { get; set; }
         [DataMember(Name = "contact_methods")]
         public List<PagerDutyContact> ContactMethods { get; set; }
+
         [DataMember(Name = "on_call")] 
         public List<OnCall> Schedule { get; set; }
 
@@ -151,14 +104,14 @@ namespace StackExchange.Opserver.Data.PagerDuty
                 if (_phone == null)
                 {
                     // The PagerDuty API does not always return a full contact. HANDLE IT.
-                    var m = ContactMethods?.FirstOrDefault(cm => cm.Type == "phone" || cm.Type == "SMS");
+                    var m = ContactMethods?.FirstOrDefault(cm => cm.Type == "phone_contact_method" || cm.Type == "sms_contact_method");
                     _phone = m != null ? m.FormattedAddress : "n/a";
                 }
                 return _phone;
             }
         }
-
-        public int? EscalationLevel => Schedule != null && Schedule.Count > 0 ? Schedule[0].EscalationLevel : (int?)null;
+        [DataMember(Name = "escalation_level")]
+        public int? EscalationLevel { get; set; }
 
         public static string GetEscalationLevelDescription(int? level)
         {
@@ -193,19 +146,18 @@ namespace StackExchange.Opserver.Data.PagerDuty
         public string Id {get; set; }
         [DataMember(Name = "label")]
         public string Label { get; set; }
-        [DataMember(Name = "address")]
+        [DataMember(Name="address")]
         public string Address { get; set; }
-        [DataMember(Name = "type")]
-        public string Type { get; set; }
-
+        [DataMember(Name="country_code")]
+        public int? CountryCode { get; set; }
         public string FormattedAddress
         {
             get
             {
                 switch (Type)
                 {
-                    case "SMS":
-                    case "phone":
+                    case "sms_contact_method":
+                    case "phone_contact_method":
                         // I'm sure no one outside the US uses this...
                         // we will have to fix this soon
                         return Regex.Replace(Address, @"(\d{3})(\d{3})(\d{4})", "$1-$2-$3");
@@ -214,19 +166,71 @@ namespace StackExchange.Opserver.Data.PagerDuty
                 }
             }
         }
+        [DataMember(Name = "type")]
+        public string Type { get; set; }
+
+       
     }
 
-    public class OnCall
+    public class EscalationPolicy
     {
-        [DataMember(Name = "level")]
-        public int EscalationLevel { get; set; }
+        public string Id;
+        public string Type;
+        public string Summary;
+    }
+
+    public class OnCallUser
+    {
+        [DataMember(Name = "id")]
+        public string Id { get; set; }
+    }
+    public class OnCall : IMonitorStatus
+    {
+        [DataMember(Name = "escalation_level")]
+        public int? EscalationLevel { get; set; }
         [DataMember(Name = "start")]
         public DateTime? StartDate { get; set; }
         [DataMember(Name = "end")]
         public DateTime? EndDate { get; set; }
         [DataMember(Name = "escalation_policy")]
-        public Dictionary<string,string> Policy { get; set; } 
+        public EscalationPolicy Policy { get; set; } 
         [DataMember(Name = "user")]
-        public PagerDutyPerson AssignedUser { get; set; }
+        public OnCallUser User { get; set; }
+
+        public PagerDutyPerson AssignedUser => PagerDutyAPI.Instance.AllUsers.Data.FirstOrDefault(u => u.Id == User.Id);
+
+        public bool IsOverride { get; set; }
+
+        public bool IsPrimary => EscalationLevel == 1;
+
+        public string EscalationLevelDescription
+        {
+            get
+            {
+                if (EscalationLevel.HasValue)
+                {
+                    switch (EscalationLevel.Value)
+                    {
+                        case 1:
+                            return "Primary";
+                        case 2:
+                            return "Secondary";
+                        case 3:
+                            return "Third";
+                        default:
+                            return EscalationLevel.Value + "th";
+                    }
+                }
+                else
+                {
+                    return "unknown";
+                }
+            }
+        }
+
+        public MonitorStatus MonitorStatus { get; internal set; }
+
+        public string MonitorStatusReason { get; internal set; }
     }
+
 }

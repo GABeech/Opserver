@@ -82,7 +82,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         }
     }
 
-    class PagerDutyScheduleResponse
+    public class PagerDutyScheduleResponse
     {
         [DataMember(Name="schedules")]
         public List<PagerDutySchedule> Schedules { get; set; }

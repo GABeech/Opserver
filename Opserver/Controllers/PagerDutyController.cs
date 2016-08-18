@@ -37,10 +37,14 @@ namespace StackExchange.Opserver.Controllers
         {
             var i = PagerDutyAPI.Instance;
             i.WaitForFirstPoll(5000);
-            
+
+            i.OnCallInfo.Data.Sort(
+                (a, b) =>
+                    a.EscalationLevel.GetValueOrDefault(int.MaxValue)
+                        .CompareTo((b.EscalationLevel.GetValueOrDefault(int.MaxValue))));
             var vd = new PagerDutyModel
             {
-                Schedule = i.GetSchedule(),
+                Schedule = i.OnCallInfo.Data,
                 OnCallToShow = i.Settings.OnCallToShow,
                 CachedDays = i.Settings.DaysToCache,
                 AllIncidents = i.Incidents.SafeData(true),
@@ -65,7 +69,7 @@ namespace StackExchange.Opserver.Controllers
         [Route("pagerduty/escalation/full")]
         public ActionResult FullEscalation()
         {
-            return View("PagerDuty.EscFull", PagerDutyAPI.Instance.GetSchedule());
+            return View("PagerDuty.EscFull", PagerDutyAPI.Instance.OnCallInfo.Data);
         }
     }
 }

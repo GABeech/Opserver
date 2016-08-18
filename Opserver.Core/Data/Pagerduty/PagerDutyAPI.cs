@@ -26,7 +26,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         {
             if (OnCallInfo.ContainsData)
             {
-                foreach (var a in GetSchedule())
+                foreach (var a in OnCallInfo.Data)
                     yield return a.MonitorStatus;
             }
             if (Incidents.ContainsData)
@@ -58,7 +58,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         public PagerDutyAPI()
         {
             Settings = Current.Settings.PagerDuty;
-            CacheItemFetched += (sender, args) => { _scheduleCache = null; };
+            //CacheItemFetched += (sender, args) => { _scheduleCache = null; };
         }
 
         /// <summary>
@@ -150,7 +150,7 @@ namespace StackExchange.Opserver.Data.PagerDuty
         {
             try
             {
-                return GetFromPagerDutyAsync("users", r => JSON.Deserialize<PagerDutyUserResponse>(r.ToString(), JilOptions).Users);
+                return GetFromPagerDutyAsync("users?include[]=contact_methods", r => JSON.Deserialize<PagerDutyUserResponse>(r.ToString(), JilOptions).Users);
             }
             catch(DeserializationException de)
             {
