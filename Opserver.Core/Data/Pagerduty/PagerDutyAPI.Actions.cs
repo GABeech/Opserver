@@ -24,8 +24,12 @@ namespace StackExchange.Opserver.Data.PagerDuty
             */
             var data = new
             {
-                type = "incident_reference",
-                status = newStatus
+                incident = new
+                {
+                    type = "incident_reference",
+                    status = newStatus.ToString()
+                }
+                
             };
 
             var headers = new Dictionary<string,string>()
