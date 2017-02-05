@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 using Jil;
+using PhoneNumbers;
 
 namespace StackExchange.Opserver.Data.PagerDuty
 {
@@ -167,26 +168,42 @@ namespace StackExchange.Opserver.Data.PagerDuty
         public string Label { get; set; }
         [DataMember(Name = "address")]
         public string Address { get; set; }
+        [DataMember(Name = "country_code")]
+        public int? CountryCode { get; set; }
         [DataMember(Name = "type")]
         public string Type { get; set; }
-
+        
         public string FormattedAddress
         {
             get
             {
                 switch (Type)
                 {
-                    case "SMS":
-                    case "phone":
+                    case "sms_contact_method":
+                    case "phone_contact_method":
+
+                        var numberUtil = PhoneNumberUtil.GetInstance();
+                        var number = numberUtil.Parse(Address, numberUtil.GetRegionCodeForCountryCode(CountryCode.Value));
+                        if (CountryCode.HasValue)
+                        {
+                            number.CreateBuilderForType().SetCountryCode(CountryCode.Value).SetRawInput(Address).Build();
+
+                        }
+
                         // I'm sure no one outside the US uses this...
                         // we will have to fix this soon
-                        return Regex.Replace(Address, @"(\d{3})(\d{3})(\d{4})", "$1-$2-$3");
+                        // NOTE: C# port of Google's Phone number formatting Library can be found here:
+                        // https://www.nuget.org/packages/libphonenumber-csharp/
+                        // FOR POSTARITY:
+                        //return Regex.Replace(Address, @"(\d{3})(\d{3})(\d{4})", "$1-$2-$3");
+                        return numberUtil.Format(number, PhoneNumberFormat.INTERNATIONAL);
                     default:
                         return Address;
                 }
             }
         }
     }
+    
 
     public class OnCall
     {
