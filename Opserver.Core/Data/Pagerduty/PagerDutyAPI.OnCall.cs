@@ -5,6 +5,7 @@ using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Jil;
+using PhoneNumbers;
 
 namespace StackExchange.Opserver.Data.PagerDuty
 {
@@ -145,11 +146,22 @@ namespace StackExchange.Opserver.Data.PagerDuty
                 {
                     case "sms_contact_method":
                     case "phone_contact_method":
+                         
+                        var numberUtil = PhoneNumberUtil.GetInstance();
+                        var number = numberUtil.Parse(Address, numberUtil.GetRegionCodeForCountryCode(CountryCode.Value));
+                        if (CountryCode.HasValue)
+                        {
+                            number.CreateBuilderForType().SetCountryCode(CountryCode.Value).SetRawInput(Address).Build();
+                            
+                        }
+
                         // I'm sure no one outside the US uses this...
                         // we will have to fix this soon
                         // NOTE: C# port of Google's Phone number formatting Library can be found here:
                         // https://www.nuget.org/packages/libphonenumber-csharp/
-                        return Regex.Replace(Address, @"(\d{3})(\d{3})(\d{4})", "$1-$2-$3");
+                        // FOR POSTARITY:
+                        //return Regex.Replace(Address, @"(\d{3})(\d{3})(\d{4})", "$1-$2-$3");
+                        return numberUtil.Format(number, PhoneNumberFormat.INTERNATIONAL);
                     default:
                         return Address;
                 }
